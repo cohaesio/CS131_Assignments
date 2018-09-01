@@ -1,7 +1,20 @@
 # CS131: Computer Vision Foundations and Applications
+## 课程和作业介绍
 This repository contains the released assignments for the fall 2017 iteration of [CS 131](http://vision.stanford.edu/teaching/cs131_fall1718/), a course at Stanford taught by [Juan Carlos Niebles](http://www.niebles.net) and [Ranjay Krishna](http://ranjaykrishna.com).
 
-The assignments cover a wide range of topics in computer vision and should expose students to a broad range of concepts and applications. Homework 0 sets up the course with an introduction on how to use images in python and numpy. It covers basic linear algebra that would be helpful through the course.
+The assignments cover a wide range of topics in computer vision and should expose students to a broad range of concepts and applications. 
+
+## 编程环境
+- Python 3
+- Jupyter Notebook
+- Package 参照每个每份作业文件夹下的`requirement.txt`
+
+提示：运行`pip install -r requirements.txt` 安装共享环境。
+
+## Homework 0：Basics 
+
+- 使用Python和Numpy操作图像
+- 基础线性代数知识
 
 Homework 1 starts off the topics in computer vision by understanding concepts such as convolutions, linear systems and different kernels and how to design them to find certains signals in images. Homework 2 focuses on edge detection, applying it to lane detection to aid self driving cars. Homework 3 introduces SIFT and RANSAC, which are useful for finding corresponding points in multiple images, enabling applications like panorama creation, which is a common feature in most of our smart phones.
 

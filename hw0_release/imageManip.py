@@ -18,7 +18,7 @@ def load(image_path):
 
     ### YOUR CODE HERE
     # Use skimage io.imread
-    pass
+    out = io.imread(image_path)
     ### END YOUR CODE
 
     return out
@@ -38,7 +38,7 @@ def change_value(image):
     out = None
 
     ### YOUR CODE HERE
-    pass
+    out = np.multiply(0.5, np.multiply(image, image))
     ### END YOUR CODE
 
     return out
@@ -56,7 +56,7 @@ def convert_to_grey_scale(image):
     out = None
 
     ### YOUR CODE HERE
-    pass
+    out = color.rgb2gray(image)
     ### END YOUR CODE
 
     return out
@@ -72,10 +72,17 @@ def rgb_decomposition(image, channel):
         out: numpy array of shape(image_height, image_width, 3)
     """
 
-    out = None
+    out = image.copy()
 
     ### YOUR CODE HERE
-    pass
+    if channel is 'R':
+        out[:, :, 0] = 0
+    elif channel is 'G':
+        out[:, :, 1] = 0
+    elif channel is 'B':
+        out[:, :, 2] = 0
+    else:
+        print("Channel ERROR")
     ### END YOUR CODE
 
     return out
@@ -95,7 +102,14 @@ def lab_decomposition(image, channel):
     out = None
 
     ### YOUR CODE HERE
-    pass
+    if channel is 'L':
+        out = image[:, :, 0]
+    elif channel is 'A':
+        out = image[:, :, 1]
+    elif channel is 'B':
+        out = image[:, :, 2]
+    else:
+        print("Channel ERROR")
     ### END YOUR CODE
 
     return out
@@ -115,7 +129,14 @@ def hsv_decomposition(image, channel='H'):
     out = None
 
     ### YOUR CODE HERE
-    pass
+    if channel is 'H':
+        out = hsv[:, :, 0]
+    elif channel is 'S':
+        out = hsv[:, :, 1]
+    elif channel is 'V':
+        out = hsv[:, :, 2]
+    else:
+        print("Channel ERROR")
     ### END YOUR CODE
 
     return out
@@ -136,7 +157,11 @@ def mix_images(image1, image2, channel1, channel2):
 
     out = None
     ### YOUR CODE HERE
-    pass
+    image1 = image1[:, :int(image1.shape[0] / 2)];
+    image2 = image2[:, int(image1.shape[0] / 2):];
+    image1 = rgb_decomposition(image1, channel1)
+    image2 = rgb_decomposition(image2, channel2)
+    out = np.concatenate((image1, image2), axis=1)
     ### END YOUR CODE
 
     return out
