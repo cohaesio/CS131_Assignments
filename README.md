@@ -22,10 +22,16 @@ The assignments cover a wide range of topics in computer vision and should expos
 - 理解基本概念
     - 卷积
     - 线性系统
-    - 不同的卷积核
+    - 卷积核分解
 - 设计卷积核来寻找图像的特定信号
 
-Homework 2 focuses on edge detection, applying it to lane detection to aid self driving cars. Homework 3 introduces SIFT and RANSAC, which are useful for finding corresponding points in multiple images, enabling applications like panorama creation, which is a common feature in most of our smart phones.
+## Homework 2: Edges - Smart Car lane Detection
+
+- 边缘检测
+- 霍夫变换检测直线
+- 车道线检测
+
+Homework 3 introduces SIFT and RANSAC, which are useful for finding corresponding points in multiple images, enabling applications like panorama creation, which is a common feature in most of our smart phones.
 
 Moving beyond pixels and edges, homework 4 takes a wider view of the image and asks students to use a dynamic programming algorithm to define the energy of certain regions in an image. This energy definition allows us to find regions that are important, enabling different monitors with varying sizes (large projections, medium laptop screens and small cell phones) to display only the important portions of an image. We specifically ask students to implements different versions of seam carving while preserving the structure of objects in images.
 

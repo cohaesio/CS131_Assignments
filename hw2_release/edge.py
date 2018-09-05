@@ -27,7 +27,32 @@ def conv(image, kernel):
     padded = np.pad(image, pad_width, mode='edge')
 
     ### YOUR CODE HERE
-    pass
+    # faster conv in hw1
+    # 卷积向量化
+    kernel_Vec = kernel.reshape(Hk*Wk,1)
+    # 计算块向量化，并组成大矩阵
+    vec_Mat = np.zeros((Hi*Wi, Hk*Wk))
+    for row in range(Hi):
+        for col in range(Wi):
+            vec_Mat[row*Wi + col, :] = padded[row:row+Hk,col:col+Wk].reshape(1, Hk*Wk)
+    # 进行内积计算
+    result = np.dot(vec_Mat, kernel_Vec)
+    # reshape恢复图像尺寸
+    out = result.reshape(Hi,Wi)
+
+    # 注意卷积形式不同内核也需要注意
+    # kernel = np.flip(kernel, 0)
+    # kernel = np.flip(kernel, 1)
+    #
+    # for Y in range(Hi):
+    #     for X in range(Wi):
+    #         # trans X,Y to indexs in imgBig matrix
+    #         localY = Y + pad_width0
+    #         localX = X + pad_width1
+    #         imageArea = padded[localY - pad_width0:localY + pad_width0 + 1, localX - pad_width1:localX + pad_width1 + 1]
+    #         out[Y, X] = np.sum(np.multiply(imageArea, kernel))
+
+
     ### END YOUR CODE
 
     return out
@@ -52,7 +77,12 @@ def gaussian_kernel(size, sigma):
     kernel = np.zeros((size, size))
 
     ### YOUR CODE HERE
-    pass
+    k = int(size / 2)
+
+    for i in range(size):
+        for j in range(size):
+            kernel[i, j] = 1 / (2 * np.pi * np.square(sigma)) * np.exp(
+                -1 * (np.square(i - k) + np.square(j - k)) / (2 * np.square(sigma)))
     ### END YOUR CODE
 
     return kernel
@@ -72,7 +102,10 @@ def partial_x(img):
     out = None
 
     ### YOUR CODE HERE
-    pass
+    kernel = np.array([[0, 0, 0],
+                       [-0.5, 0, 0.5],
+                       [0, 0, 0]])
+    out = conv(img,kernel)
     ### END YOUR CODE
 
     return out
@@ -92,7 +125,10 @@ def partial_y(img):
     out = None
 
     ### YOUR CODE HERE
-    pass
+    kernel = np.array([[0, -0.5, 0],
+                       [0, 0, 0],
+                       [0, 0.5, 0]])
+    out = conv(img,kernel)
     ### END YOUR CODE
 
     return out
@@ -113,7 +149,13 @@ def gradient(img):
     theta = np.zeros(img.shape)
 
     ### YOUR CODE HERE
-    pass
+    Gx = partial_x(img)
+    Gy = partial_y(img)
+    G = np.sqrt(np.square(Gx) + np.square(Gy))
+
+    theta = np.arctan2(Gy, Gx) * 180 / np.pi
+    theta = theta % 360
+
     ### END YOUR CODE
 
     return G, theta
@@ -136,10 +178,72 @@ def non_maximum_suppression(G, theta):
     out = np.zeros((H, W))
 
     # Round the gradient direction to the nearest 45 degrees
-    theta = np.floor((theta + 22.5) / 45) * 45
+    # 只用0,45，90,135 四个方向
+    theta = np.floor((theta + 22.5) / 45) * 45 % 180
 
     ### BEGIN YOUR CODE
-    pass
+
+    # # 需要注意的是前后不能影响，即非最大抑制的时候，抑制结果不能影响后面的判断，所以处理结果应该放在另外一块存储空间内
+    #     #     # # 还是要注意深拷贝和浅拷贝啊
+    #     #     # out = G.copy()
+    #     #     #
+    #     #     # # 计算边缘梯度需要填充边缘
+    #     #     # img = np.zeros([H+2,W+2])
+    #     #     # img[1:H+1, 1:W+1] = G
+    #     #     #
+    #     #     # for row in range(H):
+    #     #     #     for col in range(W):
+    #     #     #         patch = img[row:row+3,col:col+3]
+    #     #     #         # print(patch)
+    #     #     #
+    #     #     #         if theta[row,col] == 0.0:
+    #     #     #             if patch[1, 1] != max(patch[1,0], patch[1,1], patch[1,2]):
+    #     #     #                 out[row,col] = 0
+    #     #     #         elif theta[row,col] == 45.0:
+    #     #     #             if patch[1, 1] != max(patch[0,2], patch[1,1], patch[2,0]):
+    #     #     #                 out[row, col] = 0
+    #     #     #         elif theta[row,col] == 90.0:
+    #     #     #             if patch[1, 1] != max(patch[0,1], patch[1,1], patch[2,1]):
+    #     #     #                 out[row, col] = 0
+    #     #     #         elif theta[row,col] == 135.0:
+    #     #     #             if patch[1, 1] != max(patch[0,0], patch[1,1], patch[2,2]):
+    #     #     #                 out[row, col] = 0
+    #     #     #         else:
+    #     #     #             print("Error")
+
+    # 新写的比不上我几个月前写的，哭死
+    pos_neg = np.zeros((3, 3))
+    pos_neg[1, 1] = 1
+
+    if theta[0, 0] == 0.0:
+        pos_neg[1, 0] = 1
+        pos_neg[1, 2] = 1
+    elif theta[0, 0] == 45.0:
+        pos_neg[0, 2] = 1
+        pos_neg[2, 0] = 1
+    elif theta[0, 0] == 90.0:
+        pos_neg[0, 1] = 1
+        pos_neg[2, 1] = 1
+    elif theta[0, 0] == 135.0:
+        pos_neg[0, 0] = 1
+        pos_neg[2, 2] = 1
+    else:
+        print("Error")
+
+    biggerImg = np.zeros((H + 2, W + 2))
+    biggerImg[1:H + 1, 1:W + 1] = G
+
+    for Y in range(H):
+        for X in range(W):
+            localY = Y + 1
+            localX = X + 1
+
+            imageArea = biggerImg[localY - 1:localY + 2, localX - 1:localX + 2]
+
+            if imageArea[1, 1] != np.max(np.multiply(imageArea, pos_neg)):
+                out[Y, X] = 0
+            else:
+                out[Y, X] = imageArea[1, 1]
     ### END YOUR CODE
 
     return out
@@ -164,7 +268,26 @@ def double_thresholding(img, high, low):
     weak_edges = np.zeros(img.shape)
 
     ### YOUR CODE HERE
-    pass
+
+    # # 第一种写法
+    # strong_edges = np.zeros(img.shape, dtype=bool)  # add dtype=bool
+    # weak_edges = np.zeros(img.shape, dtype=bool)
+    # for Y in range(img.shape[0]):
+    #     for X in range(img.shape[1]):
+    #         if img[Y, X] >= high:
+    #             strong_edges[Y, X] = True
+    #             weak_edges[Y, X] = False
+    #         elif low <= img[Y, X] < high:
+    #             strong_edges[Y, X] = False
+    #             weak_edges[Y, X] = True
+    #         else:
+    #             strong_edges[Y, X] = False
+    #             weak_edges[Y, X] = False
+
+    # 第二种写法
+    strong_edges = img >= high
+    weak_edges = (img < high) & (img >= low)
+
     ### END YOUR CODE
 
     return strong_edges, weak_edges
@@ -216,8 +339,31 @@ def link_edges(strong_edges, weak_edges):
     indices = np.stack(np.nonzero(strong_edges)).T
     edges = np.zeros((H, W))
 
-    ### YOUR CODE HERE
-    pass
+    ## YOUR CODE HERE
+    # for index in indices:
+    #     y = index[0]
+    #     x = index[1]
+    #     edges[y, x] = 1  # label itself
+    #
+    #     neighbor = get_neighbors(y, x, H, W)
+    #     for neighborIndex in neighbor:
+    #         neighborY = neighborIndex[0]
+    #         neighborX = neighborIndex[1]
+    #         if strong_edges[neighborY, neighborX]:
+    #             edges[neighborY, neighborX] = 1
+    #
+    #         if weak_edges[neighborY, neighborX]:
+    #             edges[neighborY, neighborX] = 1
+
+    # 之前我这里有个误区就是，weak只能在strong附近才算edge,实际上应该是weak能连通到strong就算edge了
+    # 参考mikucy写法
+    edges = np.copy(strong_edges)
+    for row in range(H):
+        for col in range(W):
+            neighbors = get_neighbors(row, col, H, W)
+            if weak_edges[row, col] and np.any(edges[r, c] for r, c in neighbors):
+                edges[row, col] = True
+
     ### END YOUR CODE
 
     return edges
@@ -235,7 +381,12 @@ def canny(img, kernel_size=5, sigma=1.4, high=20, low=15):
         edge: numpy array of shape(H, W)
     """
     ### YOUR CODE HERE
-    pass
+    kernel = gaussian_kernel(kernel_size, sigma)
+    smoothed = conv(img, kernel)
+    G, theta = gradient(smoothed)
+    nms = non_maximum_suppression(G, theta)
+    strong_edges, weak_edges = double_thresholding(nms, high, low)
+    edge = link_edges(strong_edges, weak_edges)
     ### END YOUR CODE
 
     return edge
@@ -275,7 +426,13 @@ def hough_transform(img):
     # Find rho corresponding to values in thetas
     # and increment the accumulator in the corresponding coordiate.
     ### YOUR CODE HERE
-    pass
+    for i in range(len(ys)):
+        x = xs[i]
+        y = ys[i]
+        for thedaIdx in range(num_thetas):
+            rho = x * cos_t[thedaIdx] + y * sin_t[thedaIdx]
+            accumulator[int(rho + diag_len), thedaIdx] += 1
+
     ### END YOUR CODE
 
     return accumulator, rhos, thetas
