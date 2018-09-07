@@ -34,7 +34,18 @@ def harris_corners(img, window_size=3, k=0.04):
     dy = filters.sobel_h(img)
 
     ### YOUR CODE HERE
-    pass
+    Ix2 = np.multiply(dx,dx)
+    Iy2 = np.multiply(dy,dy)
+    IxIy = np.multiply(dx,dy)
+
+    A = convolve(Ix2,window)
+    B = convolve(Iy2,window)
+    C = convolve(IxIy,window)
+
+    detM = np.multiply(A, B) - np.multiply(C, C)
+    traceM = A + B
+
+    response = detM - k * traceM
     ### END YOUR CODE
 
     return response
@@ -60,7 +71,13 @@ def simple_descriptor(patch):
     """
     feature = []
     ### YOUR CODE HERE
-    pass
+    mean = np.mean(patch)
+    sigma = np.std(patch)
+    if sigma == 0.0:
+        sigma = 1
+
+    normalized = (patch - mean) / sigma
+    feature = normalized.flatten()
     ### END YOUR CODE
     return feature
 
@@ -83,12 +100,13 @@ def describe_keypoints(image, keypoints, desc_func, patch_size=16):
 
     for i, kp in enumerate(keypoints):
         y, x = kp
-        patch = image[y-(patch_size//2):y+((patch_size+1)//2),
-                      x-(patch_size//2):x+((patch_size+1)//2)]
+        patch = image[y - (patch_size // 2):y + ((patch_size + 1) // 2),
+                x - (patch_size // 2):x + ((patch_size + 1) // 2)]
         desc.append(desc_func(patch))
     return np.array(desc)
 
 
+import heapq
 def match_descriptors(desc1, desc2, threshold=0.5):
     """
     Match the feature descriptors by finding distances between them. A match is formed 
@@ -105,14 +123,18 @@ def match_descriptors(desc1, desc2, threshold=0.5):
         of matching descriptors
     """
     matches = []
-    
-    N = desc1.shape[0]
-    dists = cdist(desc1, desc2)
+
+    M = desc1.shape[0]
+    dists = cdist(desc1, desc2) #cdist函数就是计算欧几里得距离的函数
 
     ### YOUR CODE HERE
-    pass
+    for i in range(M):
+        min2 = heapq.nsmallest(2, dists[i,:])
+        if min2[0] / min2[1] < threshold:
+            matches.append([i, np.argmin(dists[i,:])])
+    matches = np.asarray(matches)
     ### END YOUR CODE
-    
+
     return matches
 
 
@@ -130,18 +152,18 @@ def fit_affine_matrix(p1, p2):
         H: a matrix of shape (P * P) that transform p2 to p1.
     """
 
-    assert (p1.shape[0] == p2.shape[0]),\
+    assert (p1.shape[0] == p2.shape[0]), \
         'Different number of points in p1 and p2'
     p1 = pad(p1)
     p2 = pad(p2)
 
     ### YOUR CODE HERE
-    pass
+    H, residuals, rank, s = np.linalg.lstsq(p2, p1, rcond=None)
     ### END YOUR CODE
 
     # Sometimes numerical issues cause least-squares to produce the last
     # column which is not exactly [0, 0, 1]
-    H[:,2] = np.array([0, 0, 1])
+    H[:, 2] = np.array([0, 0, 1])
     return H
 
 
@@ -170,20 +192,40 @@ def ransac(keypoints1, keypoints2, matches, n_iters=200, threshold=20):
     N = matches.shape[0]
     n_samples = int(N * 0.2)
 
-    matched1 = pad(keypoints1[matches[:,0]])
-    matched2 = pad(keypoints2[matches[:,1]])
+    matched1 = pad(keypoints1[matches[:, 0]])
+    matched2 = pad(keypoints2[matches[:, 1]])
 
     max_inliers = np.zeros(N)
     n_inliers = 0
 
     # RANSAC iteration start
     ### YOUR CODE HERE
-    pass
+    for i in range(n_iters):
+        inliersArr = np.zeros(N)
+        idx = np.random.choice(N, n_samples, replace=False)
+        p1 = matched1[idx, :]
+        p2 = matched2[idx, :]
+
+        H, residuals, rank, s = np.linalg.lstsq(p2, p1, rcond=None)
+        H[:, 2] = np.array([0, 0, 1])
+
+        output = np.dot(matched2, H)
+        inliersArr = np.linalg.norm(output-matched1, axis=1)**2 < threshold
+        inliersCount = np.sum(inliersArr)
+
+        if inliersCount > n_inliers:
+            max_inliers = inliersArr.copy() #还是注意深拷贝和浅拷贝啊
+            n_inliers = inliersCount
+
+    # 迭代完成，拿最大数目的匹配点对进行估计变换矩阵
+    H, residuals, rank, s = np.linalg.lstsq(matched2[max_inliers], matched1[max_inliers], rcond=None)
+    H[:, 2] = np.array([0, 0, 1])
+
     ### END YOUR CODE
     return H, matches[max_inliers]
 
 
-def hog_descriptor(patch, pixels_per_cell=(8,8)):
+def hog_descriptor(patch, pixels_per_cell=(8, 8)):
     """
     Generating hog descriptor by the following steps:
 
@@ -199,19 +241,19 @@ def hog_descriptor(patch, pixels_per_cell=(8,8)):
     Returns:
         block: 1D array of shape ((h*w*n_bins)/(m*n))
     """
-    assert (patch.shape[0] % pixels_per_cell[0] == 0),\
-                'Heights of patch and cell do not match'
-    assert (patch.shape[1] % pixels_per_cell[1] == 0),\
-                'Widths of patch and cell do not match'
+    assert (patch.shape[0] % pixels_per_cell[0] == 0), \
+        'Heights of patch and cell do not match'
+    assert (patch.shape[1] % pixels_per_cell[1] == 0), \
+        'Widths of patch and cell do not match'
 
     n_bins = 9
     degrees_per_bin = 180 // n_bins
 
     Gx = filters.sobel_v(patch)
     Gy = filters.sobel_h(patch)
-   
+
     # Unsigned gradients
-    G = np.sqrt(Gx**2 + Gy**2)
+    G = np.sqrt(Gx ** 2 + Gy ** 2)
     theta = (np.arctan2(Gy, Gx) * 180 / np.pi) % 180
 
     G_cells = view_as_blocks(G, block_shape=pixels_per_cell)
@@ -223,7 +265,25 @@ def hog_descriptor(patch, pixels_per_cell=(8,8)):
 
     # Compute histogram per cell
     ### YOUR CODE HERE
-    pass
+
+    # 遍历Cell
+    for row in range(rows):
+        for col in range(cols):
+            # 遍历cell中的像素
+            for y in range(pixels_per_cell[0]):
+                for x in range(pixels_per_cell[1]):
+                    # 计算该像素的梯度方向（在n_bins个方向中属于第几个区间）
+                    angle = theta_cells[row,col,y,x]
+                    order = int(angle) // degrees_per_bin
+                    if order == 9:
+                        order = 8
+                    # 统计该cell中每个方向区间内的强度
+                    # 累加强度也可以
+                    cells[row,col,order] += G_cells[row,col,y,x]
+
+    # 做归一化处理
+    cells = (cells - cells.mean()) / (cells.std())
+    block = cells.reshape(-1) # 一维
     ### YOUR CODE HERE
-    
+
     return block
