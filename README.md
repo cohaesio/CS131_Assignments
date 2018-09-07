@@ -31,7 +31,12 @@ The assignments cover a wide range of topics in computer vision and should expos
 - 霍夫变换检测直线
 - 车道线检测
 
-Homework 3 introduces SIFT and RANSAC, which are useful for finding corresponding points in multiple images, enabling applications like panorama creation, which is a common feature in most of our smart phones.
+## Homework 3: Panorama - Image Stiching
+
+- 介绍HOG和RANSAC
+- 多幅图像中寻找匹配点
+- 估计图像间仿射变换矩阵
+- 实现拼接操作
 
 Moving beyond pixels and edges, homework 4 takes a wider view of the image and asks students to use a dynamic programming algorithm to define the energy of certain regions in an image. This energy definition allows us to find regions that are important, enabling different monitors with varying sizes (large projections, medium laptop screens and small cell phones) to display only the important portions of an image. We specifically ask students to implements different versions of seam carving while preserving the structure of objects in images.
 
