@@ -34,11 +34,34 @@ def kmeans(features, k, num_iters=100):
     centers = features[idxs]
     assignments = np.zeros(N)
 
+    num = 0
     for n in range(num_iters):
         ### YOUR CODE HERE
-        pass
-        ### END YOUR CODE
 
+        # 分配每个点至最近的聚类中心
+        for i in range(N):
+            dist = np.linalg.norm(features[i]-centers, axis=1)
+            assignments[i] = np.argmin(dist)
+
+        # 重新计算每个聚类中心的位置
+        newCenters = np.zeros((k, D))
+        for idx in range(k):
+            # 每个聚类的所有下标
+            index = np.where(assignments==idx)
+            # 计算均值
+            newCenters[idx] = np.mean(features[index],axis=0)
+
+        # 如果不再移动则停止迭代
+        # 还可以用allclose函数进行判断
+        if np.linalg.norm(newCenters-centers) < 1e-20:
+            break
+        else:
+            centers = newCenters
+
+        num = n
+        ### END YOUR CODE
+    # 输出迭代次数
+    print("迭代次数",n)
     return assignments
 
 def kmeans_fast(features, k, num_iters=100):
@@ -72,7 +95,34 @@ def kmeans_fast(features, k, num_iters=100):
 
     for n in range(num_iters):
         ### YOUR CODE HERE
-        pass
+
+        # 计算每个点最近的
+        # 向量化的思路，把N个点（特征）放入一个矩阵中进行计算
+        featureMap = np.tile(features, (k,1))
+        # print(features.shape)
+        centerMap = np.repeat(centers, N, axis=0)
+        # print((centerMap.shape))
+        dist = np.linalg.norm(featureMap-centerMap, axis=1).reshape(k,N)
+        assignments = np.argmin(dist, axis=0)
+        # print(dist.shape)
+
+        # 重新计算每个聚类中心的位置
+        newCenters = np.zeros((k, D))
+        for idx in range(k):
+            # 每个聚类的所有下标
+            index = np.where(assignments == idx)
+            # 计算均值
+            newCenters[idx] = np.mean(features[index], axis=0)
+
+        # 如果不再移动则停止迭代
+        # 还可以用allclose函数进行判断
+        # if np.linalg.norm(newCenters - centers) < 1e-20:
+        if np.allclose(newCenters, centers):
+            break
+        else:
+            centers = newCenters
+
+
         ### END YOUR CODE
 
     return assignments
@@ -124,7 +174,37 @@ def hierarchical_clustering(features, k):
 
     while n_clusters > k:
         ### YOUR CODE HERE
-        pass
+
+        # 构建邻近度矩阵
+        # print(centers.shape)
+        dist = pdist(centers) # 欧氏距离
+        # print(dist.shape)
+        distMatrix = squareform(dist)
+        distMatrix = np.where(distMatrix!=0.0, distMatrix, 1e5) # 因为squareform构建的邻近度矩阵上对角线是零，影响了最短距离的判断，此处做处理
+        # print(distMatrix.shape)
+
+        # 获取最小值所在的行和列，即距离最近的两个簇的index，取较小的那个作为保留，较大的那个进行合并
+        minRow,minCol = np.unravel_index(distMatrix.argmin(), distMatrix.shape)
+        # print(minRow,minCol)
+        saveIdx = min(minRow,minCol)
+        mergeIdx = max(minRow,minCol)
+        # 将簇mergeIdx的点分配给saveIdx所在簇
+        assignments = np.where(assignments != mergeIdx, assignments, saveIdx)
+        # 因为要删除一个簇mergeIdx，所以下标的变化为:小于mergeIdx的不改变，大于saveIdx的需要减一
+        assignments = np.where(assignments < mergeIdx, assignments, assignments - 1)
+
+        # 删除被合并的簇所在中心
+        centers = np.delete(centers,mergeIdx, axis=0)
+
+        # 重新计算新的簇的中心
+        # 题目提示中提到了，考虑到运行效率，只需要对进行归并后的簇计算新的中心，别的簇并没有进行操作，所以不影响中心的变化
+        saveIdxIndecies = np.where(assignments == saveIdx)
+        centers[saveIdx] = np.mean(features[saveIdxIndecies],axis=0)
+
+        # 别忘了迭代终止条件
+        n_clusters -= 1
+
+
         ### END YOUR CODE
 
     return assignments
@@ -145,7 +225,9 @@ def color_features(img):
     features = np.zeros((H*W, C))
 
     ### YOUR CODE HERE
-    pass
+    # 图像像素已经转换为浮点数
+    # 只需要将图像转换为特征序列即可
+    features = np.reshape(img, (H*W, C))
     ### END YOUR CODE
 
     return features
@@ -173,11 +255,23 @@ def color_position_features(img):
     features = np.zeros((H*W, C+2))
 
     ### YOUR CODE HERE
-    pass
+    # 构建二维的点集，三维是meshgrid
+    # positonMap =
+    # 构建成一维的特征序列
+    position = np.dstack(np.mgrid[0:H, 0:W]).reshape((H*W,2))
+
+    # 拼接特征序列
+    features[:,0:C] = np.reshape(color, (H*W, C))
+    features[:,C:C+2] = position
+
+    # 每个维度进行归一化
+    features = (features - np.mean(features, axis=0)) / (np.std(features, axis=0))
+
     ### END YOUR CODE
 
     return features
 
+from skimage import color
 def my_features(img):
     """ Implement your own features
 
@@ -189,7 +283,36 @@ def my_features(img):
     """
     features = None
     ### YOUR CODE HERE
-    pass
+
+    # 颜色特征
+    H, W, C = img.shape
+    colors = img_as_float(img)
+
+    # 位置特征
+    # 构建二维的点集，三维是meshgrid
+    # positonMap =
+    # 构建成一维的特征序列
+    position = np.dstack(np.mgrid[0:H, 0:W]).reshape((H*W,2))
+
+
+    # 梯度特征（梯度相加形式，也可以用模值）
+    grayImg = color.rgb2gray(img)
+
+    gradient = np.gradient(grayImg)
+    gradient = np.abs(gradient[0]) + np.abs(gradient[1])
+    # gradient = np.reshape(gradient,(H*W,-1))
+    # print(gradient.shape)
+    # print(img.shape)
+    # 拼接特征序列
+    features = np.zeros((H * W, C + 3))
+
+    features[:,0:C] = np.reshape(colors, (H*W, C))
+    features[:,C:C+2] = position
+    features[:, C+2] = gradient.reshape((H*W))
+
+    # 每个维度进行归一化
+    features = (features - np.mean(features, axis=0)) / (np.std(features, axis=0))
+
     ### END YOUR CODE
     return features
     
@@ -213,7 +336,7 @@ def compute_accuracy(mask_gt, mask):
 
     accuracy = None
     ### YOUR CODE HERE
-    pass
+    accuracy = np.mean(mask == mask_gt)
     ### END YOUR CODE
 
     return accuracy
