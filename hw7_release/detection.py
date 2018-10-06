@@ -21,12 +21,17 @@ def hog_feature(image, pixel_per_cell = 8):
         hogImage: an image representation of hog provided by skimage
     '''
     ### YOUR CODE HERE
-    pass
+
+    # 需要注意pixels_per_cell的方式
+    hogFeature,hogImage = feature.hog(image=image,
+                                      pixels_per_cell=(pixel_per_cell,pixel_per_cell),
+                                      visualise=True,
+                                      feature_vector=True)
     ### END YOUR CODE
     return (hogFeature, hogImage)
 
 def sliding_window(image, base_score, stepSize, windowSize, pixel_per_cell=8):
-    ''' A sliding window that checks each different location in the image, 
+    ''' A sliding window that checks each different location in the image,
         and finds which location has the highest hog score. The hog score is computed
         as the dot product between hog feature of the sliding window and the hog feature
         of the template. It generates a response map where each location of the
@@ -50,9 +55,28 @@ def sliding_window(image, base_score, stepSize, windowSize, pixel_per_cell=8):
     H,W = image.shape
     pad_image = np.lib.pad(image, ((winH//2,winH-winH//2),(winW//2, winW-winW//2)), mode='constant')
     response_map = np.zeros((H//stepSize+1, W//stepSize+1))
-    
+
     ### YOUR CODE HERE
-    pass
+
+    # 遍历每个区域，注意步长
+    for row in range(0,H+1,stepSize):
+        for col in range(0,W+1,stepSize):
+            window = pad_image[row:row+winH,col:col+winW]
+            windowHog = feature.hog(image=window,
+                                    pixels_per_cell=(pixel_per_cell,pixel_per_cell),
+                                    feature_vector=True)
+            score = np.dot(windowHog,base_score)
+            response_map[row//stepSize,col//stepSize] = score
+
+            # 取极值
+            # 减去二分之一宽高是因为在基于padding的图像上进行的检测，需要消除这个差距
+            if score > max_score:
+                max_score = score
+                maxr = row - winH//2
+                maxc = col - winW//2
+
+    # 调整response_map的大小
+    response_map = resize(response_map,image.shape)
     ### END YOUR CODE
     
     
@@ -81,7 +105,11 @@ def pyramid(image, scale=0.9, minSize=(200, 100)):
     images.append((current_scale, image))
     # keep looping over the pyramid
     ### YOUR CODE HERE
-    pass
+    # 下采样直到图像大小达到最小目标值
+    while current_scale * image.shape[0] > minSize[0] and current_scale*image.shape[1] > minSize[1]:
+        current_scale = current_scale * scale
+        scaleImg = rescale(image,current_scale)
+        images.append((current_scale,scaleImg))
     ### END YOUR CODE
     return images
 
@@ -108,7 +136,19 @@ def pyramid_score(image,base_score, shape, stepSize=20, scale = 0.9, pixel_per_c
     max_response_map =np.zeros(image.shape)
     images = pyramid(image, scale)
     ### YOUR CODE HERE
-    pass
+    for (scale,image) in images:
+        (score, r, c, response_map) = sliding_window(image=image,
+                                                     base_score = base_score,
+                                                     stepSize=stepSize,
+                                                     windowSize=shape,
+                                                     pixel_per_cell=pixel_per_cell)
+
+        if score > max_score:
+            max_score = score
+            maxr = r
+            maxc = c
+            max_scale = scale
+            max_response_map = response_map
     ### END YOUR CODE
     return max_score, maxr, maxc, max_scale, max_response_map
 
@@ -134,9 +174,24 @@ def compute_displacement(part_centers, face_shape):
     '''
     d = np.zeros((part_centers.shape[0],2))
     ### YOUR CODE HERE
-    pass
+
+    # 计算脸部中心
+    (h, w) = face_shape
+    face_center = (h//2,w//2)
+
+    # 计算组件与中心距离
+    d = face_center - part_centers
+
+    # 计算均值与标准差
+    mu = np.mean(d, axis=0)
+    sigma = np.std(d,axis=0)
+
+    # 需要考虑mu的整数形式(向下取整)
+    mu = mu.astype('int64')
+
     ### END YOUR CODE
     return mu, sigma
+
         
 def shift_heatmap(heatmap, mu):
     '''First normalize the heatmap to make sure that all the values 
@@ -150,7 +205,15 @@ def shift_heatmap(heatmap, mu):
             new_heatmap: np array of (h,w)
     '''
     ### YOUR CODE HERE
-    pass
+
+    # 1. 归一化
+    heatmap = heatmap / np.max(heatmap)
+
+    # 2. 计算偏移
+    row, col = mu
+    new_heatmap = np.r_[heatmap[row: , :], heatmap[: row, :]]
+    new_heatmap = np.c_[new_heatmap[:, col: ], new_heatmap[:, : col]]
+
     ### END YOUR CODE
     return new_heatmap
     
@@ -170,7 +233,14 @@ def gaussian_heatmap(heatmap_face, heatmaps, sigmas):
         new_image: an image np array of (h,w) after gaussian convoluted
     '''
     ### YOUR CODE HERE
-    pass
+    for heatmap, sigma in zip(heatmaps, sigmas):
+        new_heatmap = gaussian(heatmap, sigma)
+        heatmap_face += new_heatmap
+
+    heatmap = heatmap_face
+
+    r, c = np.unravel_index(np.argmax(heatmap), heatmap.shape)
+
     ### END YOUR CODE
     return heatmap, r , c
             
