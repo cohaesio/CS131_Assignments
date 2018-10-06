@@ -45,7 +45,7 @@ def harris_corners(img, window_size=3, k=0.04):
     detM = np.multiply(A, B) - np.multiply(C, C)
     traceM = A + B
 
-    response = detM - k * traceM
+    response = detM - k * np.square(traceM)
     ### END YOUR CODE
 
     return response
