@@ -1,6 +1,6 @@
 import numpy as np
 
-
+from scipy.spatial.distance import cdist
 def compute_distances(X1, X2):
     """Compute the L2 distance between each point in X1 and each point in X2.
     It's possible to vectorize the computation entirely (i.e. not use any loop).
@@ -27,14 +27,22 @@ def compute_distances(X1, X2):
     #
     # HINT: Try to formulate the l2 distance using matrix multiplication
 
-    pass
+    # 引入scipy的cdist函数进行两个输入的距离计算
+    dists = cdist(X1, X2,metric='euclidean')
+
+    # mikucy方式，运行速度较快
+    # X1_square = np.sum(np.square(X1), axis=1)
+    # X2_square = np.sum(np.square(X2), axis=1)
+    # dists = np.sqrt(X1_square.reshape(-1, 1) - 2 * X1.dot(X2.T) + X2_square)
     # END YOUR CODE
 
     assert dists.shape == (M, N), "dists should have shape (M, N), got %s" % dists.shape
 
+
     return dists
 
 
+from collections import Counter
 def predict_labels(dists, y_train, k=1):
     """Given a matrix of distances `dists` between test points and training points,
     predict a label for each test point based on the `k` nearest neighbors.
@@ -54,7 +62,7 @@ def predict_labels(dists, y_train, k=1):
         # A list of length k storing the labels of the k nearest neighbors to
         # the ith test point.
         closest_y = []
-        # Use the distance matrix to find the k nearest neighbors of the ith
+        # Use the distance atrix to find the k mnearest neighbors of the ith
         # testing point, and use self.y_train to find the labels of these
         # neighbors. Store these labels in closest_y.
         # Hint: Look up the function numpy.argsort.
@@ -65,7 +73,33 @@ def predict_labels(dists, y_train, k=1):
         # label.
 
         # YOUR CODE HERE
-        pass
+
+        # # argsort能返回数组值从小到大的索引值,构建列表
+        # closest_y = np.argsort(dists[i,:])[:k].tolist()
+        #
+        # # 判断前k个元素中频次最多的元素
+        # # 调用Counter函数
+        #
+        # # 方法一
+        # # a = np.array([1, 9, 3, 9, 2, 9, 1, 1, 9, 9, 2, 1])
+        # # counts = np.bincount(a)
+        # # print(np.argmax(counts))
+        #
+        # # 方法二
+        # from collections import Counter
+        # # a = [1, 2, 3, 1, 2, 1, 1, 1, 3, 2, 2, 1]
+        # # b = Counter(a)
+        # # print
+        # # b.most_common(1)
+        #
+        # y_pred[i] = y_train[np.bincount(closest_y).argmax()]
+
+        # mikucy做法
+        idx = np.argsort(dists[i, :])
+        for j in range(k):
+            closest_y.append(y_train[idx[j]])
+        y_pred[i] = max(set(closest_y), key=closest_y.count)
+
         # END YOUR CODE
 
     return y_pred
@@ -92,7 +126,7 @@ def split_folds(X_train, y_train, num_folds):
         y_train: numpy array of shape (N,) containing the label of each example
         num_folds: number of folds to split the data into
 
-    jeturns:
+    returns:
         X_trains: numpy array of shape (num_folds, train_size * (num_folds-1) / num_folds, D)
         y_trains: numpy array of shape (num_folds, train_size * (num_folds-1) / num_folds)
         X_vals: numpy array of shape (num_folds, train_size / num_folds, D)
@@ -111,7 +145,17 @@ def split_folds(X_train, y_train, num_folds):
 
     # YOUR CODE HERE
     # Hint: You can use the numpy array_split function.
-    pass
+    # 用array_split 函数分割为n个片段，然后分序进行拼接
+    X_list = np.array_split(X_train,num_folds,axis=0)
+    y_train = y_train.reshape(-1, 1)
+    y_list = np.array_split(y_train, num_folds, axis=0)
+    for i in range(num_folds):
+        X_trains[i,:,:] = np.vstack(X_list[:i] + X_list[i+1:])
+        X_vals[i,:,:] = X_list[i]
+
+        y_trains[i] = np.vstack(y_list[:i] + y_list[i+1:])[:,0]
+        y_vals[i] = y_list[i][:,0]
+
     # END YOUR CODE
 
     return X_trains, y_trains, X_vals, y_vals

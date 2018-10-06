@@ -33,7 +33,20 @@ class PCA(object):
         # YOUR CODE HERE
         # 1. Compute the mean and store it in self.mean
         # 2. Apply either method to `X_centered`
-        pass
+
+        # 计算均值
+        self.mean = np.mean(X, axis=0)
+
+        # 实现零均值
+        X_centered = X - self.mean
+
+        # 选择实现PCA特征分解的方法,得到的应该是特征向量
+        if method is 'svd':
+            self.W_pca = self._svd(X_centered)[0]
+        elif method is 'eigen':
+            self.W_pca = self._eigen_decomp(X_centered)[0]
+
+
         # END YOUR CODE
 
         # Make sure that X_centered has mean zero
@@ -71,7 +84,17 @@ class PCA(object):
         #     1. compute the covariance matrix of X, of shape (D, D)
         #     2. compute the eigenvalues and eigenvectors of the covariance matrix
         #     3. Sort both of them in decreasing order (ex: 1.0 > 0.5 > 0.0 > -0.2 > -1.2)
-        pass
+
+        # 计算特征矩阵
+        covMat = np.dot(X.T, X) / (N - 1)  #(N - 1)
+        # 计算特征值和特征向量
+        eigenvalue, eigenvectors = np.linalg.eig(covMat)
+
+        # 排序，因为是从大到小，所以调用argsort需要注意
+        idx = np.argsort(-eigenvalue)
+        e_vals = eigenvalue[idx]
+        e_vecs = eigenvectors[:, idx]
+
         # END YOUR CODE
 
         # Check the output shapes
@@ -96,7 +119,15 @@ class PCA(object):
         # YOUR CODE HERE
         # Here, compute the SVD of X
         # Make sure to return vecs as the matrix of vectors where each column is a singular vector
-        pass
+
+
+        # SVD分解
+        u,s,v = np.linalg.svd(X)
+
+        # v.T是X.T*X的特征向量
+        vecs = v.T
+        vals = s
+
         # END YOUR CODE
         assert vecs.shape == (D, D)
         K = min(N, D)
@@ -120,7 +151,13 @@ class PCA(object):
         # We need to modify X in two steps:
         #     1. first substract the mean stored during `fit`
         #     2. then project onto a subspace of dimension `n_components` using `self.W_pca`
-        pass
+
+        # 实现零均值
+        X_centered = X - self.mean
+
+        # 投射，实际就是点乘
+        X_proj = np.dot(X_centered, self.W_pca[:,:n_components])
+
         # END YOUR CODE
 
         assert X_proj.shape == (N, n_components), "X_proj doesn't have the right shape"
@@ -146,14 +183,18 @@ class PCA(object):
         # Steps:
         #     1. project back onto the original space of dimension D
         #     2. add the mean that we substracted in `transform`
-        pass
+
+        # 重构就是上面投影的逆操作,有时候mikucy误我，这里就是逆操作，乘上转置就可以了。
+        X_centered = np.dot(X_proj, self.W_pca[:,:n_components].transpose())
+        X = X_centered + self.mean
+
         # END YOUR CODE
 
         return X
 
 
 class LDA(object):
-    """Class implementing Principal component analysis (PCA).
+    """Class implementing Linear Discriminant Analysis (PCA).
 
     Steps to perform PCA on a matrix of features X:
         1. Fit the training data using method `fit` (either with eigen decomposition of SVD)
@@ -185,7 +226,17 @@ class LDA(object):
         # Solve generalized eigenvalue problem for matrices `scatter_between` and `scatter_within`
         # Use `scipy.linalg.eig` instead of numpy's eigenvalue solver.
         # Don't forget to sort the values and vectors in descending order.
-        pass
+
+        # LDA的最优问题转换为了特征分解
+        # 直接求特征值和特征向量
+        e_vals, e_vecs = scipy.linalg.eig(scatter_between, scatter_within)
+
+        # 注意将特征值和向量降序排列 先对特征值进行排序
+        idx = np.argsort(-e_vals)
+
+        # 取指定数目的向量
+        e_vecs = e_vecs[:, idx]
+
         # END YOUR CODE
 
         self.W_lda = e_vecs
@@ -222,7 +273,12 @@ class LDA(object):
         for i in np.unique(y):
             # YOUR CODE HERE
             # Get the covariance matrix for class i, and add it to scatter_within
-            pass
+            X_i = X[y==i]   # (_,D)
+            X_Centered = X_i - np.mean(X_i,axis=0)  # (_,D)
+            S_i = np.dot(X_Centered.T, X_Centered)  # (D,D)
+
+            scatter_within += S_i   # (D,D)
+
             # END YOUR CODE
 
         return scatter_within
@@ -251,7 +307,11 @@ class LDA(object):
         mu = X.mean(axis=0)
         for i in np.unique(y):
             # YOUR CODE HERE
-            pass
+            X_i = X[y==i] # (_,D)
+            N_i = X_i.shape[0] # 标量
+            mu_i = np.mean(X_i,axis=0) # (_,D)
+            scatter_between += N_i * np.dot((mu_i-mu).T,(mu_i-mu)) # (D,D)
+
             # END YOUR CODE
 
         return scatter_between
@@ -270,7 +330,10 @@ class LDA(object):
         X_proj = None
         # YOUR CODE HERE
         # project onto a subspace of dimension `n_components` using `self.W_lda`
-        pass
+
+        # 投射，实际就是点乘
+        X_proj = np.dot(X, self.W_lda[:,:n_components])
+
         # END YOUR CODE
 
         assert X_proj.shape == (N, n_components), "X_proj doesn't have the right shape"
